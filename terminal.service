@@ -1,0 +1,15 @@
+[Unit]
+Description=Terminal display service
+After=network.target
+
+[Service]
+ExecStartPre=/usr/bin/stty cols 78 rows 19 -F /dev/tty1
+ExecStart=/usr/bin/terminal-display
+WorkingDirectory=/usr/bin
+Restart=always
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target
+
