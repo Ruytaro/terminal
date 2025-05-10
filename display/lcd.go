@@ -3,6 +3,7 @@ package display
 import (
 	"image/color"
 	"os"
+	"sync"
 	"terminal-display/utils"
 	"time"
 
@@ -40,6 +41,7 @@ type Display struct {
 	send   chan []byte
 	last   [][]color.Color
 	debug  bool
+	lock   sync.Mutex
 }
 
 type Chunk struct {
@@ -101,8 +103,10 @@ func (d *Display) senderLoop(closer chan (any)) {
 }
 
 func (d *Display) SetBrightness(level uint8) {
-	abs := utils.MapValue(float64(level), 0, 100, 255, 0)
-	d.sendCommand(SET_BRIGHTNESS, uint16(abs), 0, 0, 0)
+	v := 255 + float64(level)*-255/100
+	d.lock.Lock()
+	d.sendCommand(SET_BRIGHTNESS, uint16(v), 0, 0, 0)
+	d.lock.Unlock()
 }
 
 func (d *Display) Reset() {
@@ -182,8 +186,10 @@ func (d *Display) moddedChunk(chunk Chunk) bool {
 func (d *Display) updateChunk(chunk Chunk) {
 	cx := chunk.cx * chunk_size
 	cy := chunk.cy * chunk_size
+	d.lock.Lock()
 	d.sendCommand(DISPLAY_BITMAP, cx, cy, cx+chunk_size-1, cy+chunk_size-1)
 	d.send <- d.getChunk(chunk)
+	d.lock.Unlock()
 }
 
 func (d *Display) getChunk(c Chunk) []byte {
@@ -217,7 +223,9 @@ func (d *Display) SetOrientation(orientation uint8) {
 	byteBuffer[8] = byte(d.width & 255)
 	byteBuffer[9] = byte(d.height >> 8)
 	byteBuffer[10] = byte(d.height & 255)
+	d.lock.Lock()
 	d.send <- byteBuffer
+	d.lock.Unlock()
 }
 
 func (d *Display) Demo() {
