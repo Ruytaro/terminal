@@ -3,7 +3,9 @@ package main
 import (
 	_ "embed"
 	"flag"
+	"fmt"
 	"image/color"
+	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -21,6 +23,7 @@ var (
 	port       string
 	test       bool
 	brightness uint8 = maxBrightness
+	ttyNum     uint
 )
 
 const (
@@ -30,10 +33,14 @@ const (
 )
 
 func init() {
-	flag.StringVar(&port, "tty", "/dev/ttyACM0", "tty to use")
+	flag.StringVar(&port, "tty", "/dev/ttyACM0", "display tty port")
 	flag.BoolVar(&test, "test", false, "Test the display")
+	flag.UintVar(&ttyNum, "n", 1, "tty to render")
 	flag.Parse()
 	cl = make(chan any)
+	if ttyNum > 7 || ttyNum < 1 {
+		log.Fatal("Target tty must be between 1 and 7")
+	}
 	var err error
 	screen, err = display.NewDisplay(cl, port, 480, 320, fontData, test)
 	for err != nil {
@@ -53,18 +60,18 @@ func main() {
 		for {
 			data = <-chst
 			screen.Fill(0, 0, 0)
-			data = strings.Replace(data, "\t", "    ", -1)
+			data = strings.Replace(data, "\t", "  ", -1)
 			screen.WriteTextChunked(data, color.White, 0, 0, 16, 0, 0, 78)
 			screen.Update()
 		}
 	}(chst)
 	var last string
-	tc := time.NewTicker(time.Second / 10)
+	tc := time.NewTicker(time.Second / 2)
 	tm := time.NewTimer(timeout)
 	for {
 		select {
 		case <-tc.C:
-			cmd := exec.Command("tail", "/dev/vcs1")
+			cmd := exec.Command("tail", fmt.Sprintf("/dev/vcs%d", ttyNum))
 			output, err := cmd.Output()
 			utils.Check(err)
 			data := string(output)
